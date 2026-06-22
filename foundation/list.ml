@@ -47,9 +47,41 @@ OCaml 的部分应用只能从左往右固定参数，不能跳过中间参数�
 *)
 
 (*10. 分组*)
-let in_curr t f a=
+let in_curr f a t=
  if (f a) = (fst t) then ((fst t),a::(snd t)) else t
 
+let exist acc f a=
+  List.exists (fun t -> (fst t) = (f a)) acc
+
 let group_by f l =
-  let aux curr v =
-    List.fold_left 
+  List.fold_left (fun acc a -> if (exist acc f a) then List.map (in_curr f a) acc else (f a, [a])::acc) [] l;;
+
+let print_int_list l =
+  print_string "[";
+  List.iteri
+    (fun i x ->
+      if i > 0 then print_string "; ";
+      print_int x)
+    l;
+  print_string "]"
+
+
+(*打印函数*)
+let print_group t =
+  Printf.printf "(%d, " (fst t);
+  print_int_list (snd t);
+  print_string ")"
+
+let print_groups l =
+  print_string "[";
+  List.iteri
+    (fun i t ->
+      if i > 0 then print_string "; ";
+      print_group t)
+    l;
+  print_endline "]"
+
+(*测试 Ocaml foundation/list.ml*)
+let () =
+  let result = group_by (fun x -> x mod 3) [1; 2; 3; 4; 5; 6; 7; 8; 9] in
+  print_groups result
