@@ -8,7 +8,7 @@ module type QUEUE = sig
     val front : 'a t -> 'a
 end
 
-module Queue : QUEUE = struct
+module Myqueue : QUEUE = struct
     type 'a t = {
         front : 'a list;
         back : 'a list
