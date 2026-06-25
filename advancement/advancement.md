@@ -559,3 +559,490 @@ let b = next ()
 - 需要局部可变状态时，用 `ref`
 - 需要多个字段组成的可变状态时，用 `mutable record`
 
+
+## 2 模块系统
+
+模块系统用来组织代码、隐藏实现细节、表达组件之间的关系。
+
+可以先这样理解：
+
+- `module` 是一组定义的容器
+- `module type` 是模块的接口
+- 函子 functor 是接收模块并返回模块的函数
+
+模块系统解决的主要问题：
+
+- 避免名字冲突
+- 把相关函数和类型放在一起
+- 只暴露必要的接口
+- 对不同实现复用同一套代码
+
+### 2.1 模块
+
+模块 module 是一组值、类型、异常、子模块的集合。
+
+语法：
+
+```ocaml
+module 模块名 = struct
+  定义
+end
+```
+
+模块名必须以大写字母开头。
+
+例子：
+
+```ocaml
+module Counter = struct
+  type t = int
+
+  let zero = 0
+
+  let incr n =
+    n + 1
+
+  let to_int n =
+    n
+end
+```
+
+访问模块中的内容使用 `.`：
+
+```ocaml
+let a = Counter.zero
+let b = Counter.incr a
+let n = Counter.to_int b
+```
+
+模块的重点：
+
+- 把相关定义放在同一个命名空间中
+- 外部通过 `模块名.名字` 访问内容
+- 模块内部可以自由使用自己的定义
+
+#### 模块中的类型
+
+模块常常把类型和操作这个类型的函数放在一起。
+
+```ocaml
+module Point = struct
+  type t = {
+    x : float;
+    y : float;
+  }
+
+  let make x y =
+    { x; y }
+
+  let distance p =
+    sqrt (p.x *. p.x +. p.y *. p.y)
+end
+```
+
+使用：
+
+```ocaml
+let p = Point.make 3.0 4.0
+let d = Point.distance p
+```
+
+这里 `Point.t` 表示模块 `Point` 中定义的类型 `t`。
+
+```ocaml
+let origin : Point.t =
+  Point.make 0.0 0.0
+```
+
+把主要类型命名为 `t` 是 OCaml 中很常见的习惯。
+这样外部使用时会自然写成 `Point.t`、`Counter.t`、`Queue.t`。
+
+#### open
+
+`open` 可以把一个模块中的名字引入当前作用域。
+
+```ocaml
+open Point
+
+let p = make 1.0 2.0
+let d = distance p
+```
+
+`open` 的好处是代码更短，坏处是名字来源可能不够清楚。
+
+更推荐在较小范围内使用局部打开：
+
+```ocaml
+let d =
+  let open Point in
+  distance (make 3.0 4.0)
+```
+
+也可以只对一个表达式打开：
+
+```ocaml
+let d =
+  Point.(distance (make 3.0 4.0))
+```
+
+`open` 的重点：
+
+- 少量使用可以减少重复
+- 过度使用会降低可读性
+- 公共代码中通常保留 `Module.name` 会更清楚
+
+#### 文件与模块
+
+在 OCaml 中，一个 `.ml` 文件天然对应一个模块。
+
+例如文件名是：
+
+```text
+myqueue.ml
+```
+
+它在其他文件中对应的模块名通常是：
+
+```ocaml
+Myqueue
+```
+
+文件名小写，模块名首字母大写。
+
+如果 `myqueue.ml` 中有：
+
+```ocaml
+let empty = []
+```
+
+其他文件中可以通过：
+
+```ocaml
+Myqueue.empty
+```
+
+来访问它。
+
+### 2.2 模块签名
+
+模块签名 module signature 描述一个模块对外暴露什么。
+
+语法：
+
+```ocaml
+module type 签名名 = sig
+  声明
+end
+```
+
+例子：
+
+```ocaml
+module type COUNTER = sig
+  type t
+
+  val zero : t
+  val incr : t -> t
+  val to_int : t -> int
+end
+```
+
+签名中只写“有什么”，不写“怎么实现”。
+
+- `type t` 表示有一个类型 `t`
+- `val zero : t` 表示有一个值 `zero`
+- `val incr : t -> t` 表示有一个函数 `incr`
+
+让模块满足某个签名：
+
+```ocaml
+module Counter : COUNTER = struct
+  type t = int
+
+  let zero = 0
+
+  let incr n =
+    n + 1
+
+  let to_int n =
+    n
+end
+```
+
+使用：
+
+```ocaml
+let n =
+  Counter.zero
+  |> Counter.incr
+  |> Counter.to_int
+```
+
+模块签名的重点：
+
+- 签名是模块的接口
+- 实现必须提供签名中要求的内容
+- 签名之外的内容不会暴露给外部
+
+#### 隐藏实现
+
+签名可以隐藏具体实现，让外部只能通过函数操作数据。
+
+```ocaml
+module type STACK = sig
+  type 'a t
+
+  val empty : 'a t
+  val is_empty : 'a t -> bool
+  val push : 'a -> 'a t -> 'a t
+  val pop : 'a t -> 'a t
+  val top : 'a t -> 'a
+end
+```
+
+实现：
+
+```ocaml
+module Stack : STACK = struct
+  type 'a t = 'a list
+
+  let empty = []
+
+  let is_empty s =
+    s = []
+
+  let push x s =
+    x :: s
+
+  let pop s =
+    match s with
+    | [] -> failwith "empty stack"
+    | _ :: rest -> rest
+
+  let top s =
+    match s with
+    | [] -> failwith "empty stack"
+    | x :: _ -> x
+end
+```
+
+外部知道 `Stack.t` 是一个栈，但不知道它其实用 list 实现。
+
+```ocaml
+let s =
+  Stack.empty
+  |> Stack.push 1
+  |> Stack.push 2
+```
+
+由于 `type 'a t` 是抽象类型，外部不能直接把它当作 list 使用。
+这样可以保护模块内部的不变量。
+
+隐藏实现的重点：
+
+- 抽象类型让使用者依赖接口，而不是依赖内部结构
+- 以后可以把 list 实现换成别的实现，外部代码不需要改
+- 模块负责保证自己的数据始终合法
+
+#### 暴露类型实现
+
+有时也希望在签名中暴露类型的具体定义。
+
+```ocaml
+module type INT_COUNTER = sig
+  type t = int
+
+  val zero : t
+  val incr : t -> t
+end
+```
+
+这时外部知道 `t` 就是 `int`。
+
+```ocaml
+module Int_counter : INT_COUNTER = struct
+  type t = int
+
+  let zero = 0
+
+  let incr n =
+    n + 1
+end
+```
+
+使用：
+
+```ocaml
+let n : int =
+  Int_counter.incr Int_counter.zero
+```
+
+是否暴露类型实现，取决于你是否希望外部依赖这个实现。
+
+### 2.3 函子
+
+函子 functor，也常被直译为函数子，是从模块到模块的函数。
+
+普通函数接收值：
+
+```ocaml
+let add_one x =
+  x + 1
+```
+
+函子接收模块：
+
+```ocaml
+module F (M : 模块签名) = struct
+  定义
+end
+```
+
+函子适合表达：
+
+- 同一套逻辑依赖某个模块提供的能力
+- 不同模块满足同一个接口，就能复用同一套代码
+- 生成的模块带有固定的类型和函数
+
+#### 一个简单函子
+
+先定义一个签名，表示“某个类型可以转成字符串”。
+
+```ocaml
+module type SHOW = sig
+  type t
+
+  val to_string : t -> string
+end
+```
+
+定义函子：
+
+```ocaml
+module Make_printer (S : SHOW) = struct
+  let print x =
+    print_endline (S.to_string x)
+end
+```
+
+给 `int` 提供一个满足 `SHOW` 的模块：
+
+```ocaml
+module Int_show = struct
+  type t = int
+
+  let to_string =
+    string_of_int
+end
+```
+
+应用函子，生成新模块：
+
+```ocaml
+module Int_printer = Make_printer (Int_show)
+
+let () =
+  Int_printer.print 42
+```
+
+这里的关系是：
+
+- `Int_show` 提供能力
+- `Make_printer` 复用这份能力
+- `Int_printer` 是生成出来的具体模块
+
+#### 带类型约束的函子
+
+有些时候，生成模块中的函数参数类型需要和输入模块的类型保持一致。
+
+```ocaml
+module type ORDERED = sig
+  type t
+
+  val compare : t -> t -> int
+end
+```
+
+定义一个生成 `min` 函数的函子：
+
+```ocaml
+module Make_min (Ord : ORDERED) = struct
+  let min a b =
+    if Ord.compare a b <= 0 then a else b
+end
+```
+
+为整数提供比较模块：
+
+```ocaml
+module Int_ordered = struct
+  type t = int
+
+  let compare a b =
+    Stdlib.compare a b
+end
+```
+
+生成整数版本：
+
+```ocaml
+module Int_min = Make_min (Int_ordered)
+
+let a =
+  Int_min.min 3 5
+```
+
+这个例子表达的思想是：`Make_min` 不关心具体类型是什么，只关心这个类型能不能比较。
+
+函子的重点：
+
+- 函子让“模块级别的复用”成为可能
+- 输入模块必须满足指定签名
+- 输出模块可以使用输入模块提供的类型和值
+- 初学时先把函子理解为“模块工厂”
+
+### 2.4 模块、签名、函子的关系
+
+三者可以这样对应：
+
+- 模块：具体实现
+- 模块签名：接口约束
+- 函子：根据模块生成模块
+
+一个常见设计顺序：
+
+1. 先写普通模块，把功能跑通
+2. 再抽出模块签名，明确对外接口
+3. 如果发现多种实现共享同一套逻辑，再考虑函子
+
+例子：
+
+```ocaml
+module type STORAGE = sig
+  type key
+  type value
+  type t
+
+  val empty : t
+  val get : key -> t -> value option
+  val put : key -> value -> t -> t
+end
+```
+
+这个签名没有规定如何存储，只规定一个存储模块应该提供什么能力。
+
+以后可以有不同实现：
+
+- 用 list 实现
+- 用 tree 实现
+- 用 hash table 实现
+
+只要它们满足同一个签名，使用者就可以依赖同一个接口。
+
+模块系统的总结：
+
+- 用 `module` 组织实现
+- 用 `module type` 描述接口
+- 用抽象类型隐藏内部结构
+- 用函子复用依赖模块能力的代码
+- 不需要一开始就写复杂模块系统，先从清楚的模块边界开始
