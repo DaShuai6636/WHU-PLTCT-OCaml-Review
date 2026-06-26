@@ -1,0 +1,2 @@
+x := TRUE;
+PRINT IF x THEN 1 ELSE 2;

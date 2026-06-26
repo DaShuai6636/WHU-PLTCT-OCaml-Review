@@ -1,0 +1,5 @@
+x := BLOCK
+  y := 3;
+  RETURN y + 1
+END;
+PRINT y;

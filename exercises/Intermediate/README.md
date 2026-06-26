@@ -1,6 +1,5 @@
 # OCaml.org Intermediate 练习项目
-
-这个目录对应仓库根目录的 `ocaml_org_intermediate_exercises_statements.md`，包含 52 道 Intermediate 题目的函数骨架和中文测试。
+ `ocaml_org_intermediate_exercises_statements.md`，包含 52 道 Intermediate 题目的函数骨架和中文测试。
 
 ## 目录
 

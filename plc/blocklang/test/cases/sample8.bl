@@ -1,0 +1,6 @@
+x := 1;
+y := BLOCK
+  x := x * 5;
+  RETURN x = 5
+END;
+PRINT y;

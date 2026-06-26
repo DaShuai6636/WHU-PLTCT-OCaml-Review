@@ -1,0 +1,8 @@
+x := 1;
+y := BLOCK
+  x := x + 1;
+  z := x * 10;
+  RETURN z
+END;
+PRINT x;
+PRINT y;

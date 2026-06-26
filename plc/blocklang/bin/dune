@@ -1,0 +1,4 @@
+(executable
+ (name blocklang)
+ (public_name blocklang)
+ (libraries blocklang))
