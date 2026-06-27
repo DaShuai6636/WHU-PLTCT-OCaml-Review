@@ -1,0 +1,15 @@
+(executable
+ (name run_tests)
+ (libraries simpl))
+
+(rule
+ (alias runtest)
+ (deps
+  run_tests.exe)
+ (action
+  (run ./run_tests.exe)))
+
+(cram
+ (deps
+  ../bin/simpl.exe
+  (glob_files cases/*.simpl)))
