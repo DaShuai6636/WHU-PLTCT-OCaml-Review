@@ -1,7 +1,7 @@
-{
-  //防止VSCode自动补全
-  "editor.inlineSuggest.enabled": true,
-  "github.copilot.enable": {
-    "*": false
-  }
-}
+// {
+//   //防止VSCode自动补全
+//   "editor.inlineSuggest.enabled": true,
+//   "github.copilot.enable": {
+//     "*": false
+//   }
+// }
