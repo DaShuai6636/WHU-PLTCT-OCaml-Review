@@ -14,6 +14,8 @@ let rec string_of_expr = function
   | Var x -> "Var " ^ x
   | Int n -> "Int " ^ string_of_int n
   | Bool b -> "Bool " ^ string_of_bool b
+  | Fun (param, body) -> "Fun(" ^ param ^ ", " ^ string_of_expr body ^ ")"
+  | App (fn, arg) -> "App(" ^ string_of_expr fn ^ ", " ^ string_of_expr arg ^ ")"
   | Binop (op, left, right) ->
       "Binop("
       ^ String.concat ", "
@@ -36,14 +38,31 @@ let string_of_typ = Driver.string_of_typ
 let string_of_value = Driver.string_of_value
 
 let same_typ actual expected =
-  match (actual, expected) with
-  | TInt, TInt | TBool, TBool -> true
-  | _ -> false
+  let rec go env actual expected =
+    match (actual, expected) with
+    | TInt, TInt | TBool, TBool -> Some env
+    | TFun (actual_arg, actual_result), TFun (expected_arg, expected_result) -> (
+        match go env actual_arg expected_arg with
+        | None -> None
+        | Some env -> go env actual_result expected_result)
+    | TVar actual_name, TVar expected_name -> (
+        match List.assoc_opt actual_name env with
+        | Some existing ->
+            if String.equal existing expected_name then Some env else None
+        | None -> (
+            match List.find_opt (fun (_, name) -> String.equal name expected_name) env with
+            | Some _ -> None
+            | None -> Some ((actual_name, expected_name) :: env)))
+    | _ -> None
+  in
+  Option.is_some (go [] actual expected)
 
 let same_value actual expected =
   match (actual, expected) with
   | VInt a, VInt b -> a = b
   | VBool a, VBool b -> Bool.equal a b
+  | VClosure (actual_param, actual_body, _), VClosure (expected_param, expected_body, _) ->
+      String.equal actual_param expected_param && actual_body = expected_body
   | _ -> false
 
 let same_expr actual expected = actual = expected
@@ -126,7 +145,7 @@ let check_type_error name input =
           ("input: " ^ input
          ^ "\n  expected parser to succeed, but got: " ^ message)
     | Ok expr -> (
-        match protect (fun () -> Typechecker.infer [] expr) with
+        match protect (fun () -> Typechecker.infer StringMap.empty expr) with
         | Ok typ ->
             Fail
               ("input: " ^ input ^ "\n  expected type error\n  actual type: "
@@ -140,7 +159,7 @@ let check_type_error name input =
 
 let check_eval_error name expr =
   let detail =
-    match protect (fun () -> Interpreter.eval [] expr) with
+    match protect (fun () -> Interpreter.eval StringMap.empty expr) with
     | Ok value ->
         Fail
           ("expected runtime error\n  actual value: " ^ string_of_value value)
@@ -173,8 +192,18 @@ let parser_tests =
       (If (Binop (Leq, Int 1, Int 2), Int 3, Int 4));
     check_parse "let expression" "let x = 3 in x + 1"
       (Let ("x", Int 3, Binop (Add, Var "x", Int 1)));
+    check_parse "function literal" "fun x -> x + 1"
+      (Fun ("x", Binop (Add, Var "x", Int 1)));
+    check_parse "application" "f x" (App (Var "f", Var "x"));
+    check_parse "application is left associative" "f x y"
+      (App (App (Var "f", Var "x"), Var "y"));
+    check_parse "application binds tighter than plus" "f x + 1"
+      (Binop (Add, App (Var "f", Var "x"), Int 1));
+    check_parse "application of parenthesized function" "(fun x -> x) 3"
+      (App (Fun ("x", Var "x"), Int 3));
     check_parse_error "chained comparison is rejected" "1 <= 2 <= 3";
     check_parse_error "keyword is not an identifier" "let true = 1 in true";
+    check_parse_error "fun keyword is not an identifier" "let fun = 1 in fun";
     check_parse_error "illegal character" "1 @ 2";
   ]
 
@@ -198,6 +227,17 @@ let run_tests =
       (VInt 8);
     check_run "let body can be bool" "let x = 2 in x <= 3" TBool
       (VBool true);
+    check_run "function literal" "fun x -> x" (TFun (TVar "a", TVar "a"))
+      (VClosure ("x", Var "x", StringMap.empty));
+    check_run "function application" "(fun x -> x + 1) 4" TInt (VInt 5);
+    check_run "let-bound function" "let inc = fun x -> x + 1 in inc 4" TInt
+      (VInt 5);
+    check_run "closure captures environment"
+      "let x = 3 in let addx = fun y -> x + y in addx 4" TInt (VInt 7);
+    check_run "higher-order function" "(fun f -> f 3) (fun x -> x * 2)" TInt
+      (VInt 6);
+    check_run "boolean identity application" "(fun x -> x) true" TBool
+      (VBool true);
   ]
 
 let type_error_tests =
@@ -210,6 +250,10 @@ let type_error_tests =
     check_type_error "unbound variable" "x + 1";
     check_type_error "let does not bind in its own rhs" "let x = x + 1 in x";
     check_type_error "let-bound bool used as int" "let x = true in x + 1";
+    check_type_error "apply non-function" "1 2";
+    check_type_error "function argument mismatch" "(fun x -> x + 1) true";
+    check_type_error "function branch mismatch" "if true then (fun x -> x) else 1";
+    check_type_error "occurs check" "fun x -> x x";
   ]
 
 let eval_error_tests =
@@ -217,6 +261,7 @@ let eval_error_tests =
     check_eval_error "unbound variable" (Var "x");
     check_eval_error "addition runtime type check" (Binop (Add, Bool true, Int 1));
     check_eval_error "if runtime condition check" (If (Int 0, Int 1, Int 2));
+    check_eval_error "application runtime type check" (App (Int 1, Int 2));
   ]
 
 let all_tests =

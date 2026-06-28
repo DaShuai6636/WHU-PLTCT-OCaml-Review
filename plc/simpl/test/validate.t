@@ -21,3 +21,15 @@
   $ dune exec ../bin/simpl.exe -- cases/sample6.simpl
   type: int
   value: 3
+
+  $ dune exec ../bin/simpl.exe -- cases/sample7.simpl
+  type: int
+  value: 5
+
+  $ dune exec ../bin/simpl.exe -- cases/sample8.simpl
+  type: int
+  value: 7
+
+  $ dune exec ../bin/simpl.exe -- cases/sample9.simpl
+  type: int
+  value: 6
