@@ -1,0 +1,9 @@
+opam-version: "2.0"
+synopsis: "ToyLang comprehensive OCaml exercise"
+depends: [
+  "dune" {>= "3.19"}
+  "ocaml"
+]
+build: [
+  ["dune" "build" "-p" name]
+]

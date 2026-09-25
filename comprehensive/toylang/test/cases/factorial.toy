@@ -1,0 +1,7 @@
+n := 5;
+acc := 1;
+REPEAT
+  acc := acc * n;
+  n := n - 1;
+UNTIL n = 0;
+PRINT acc;

@@ -1,0 +1,5 @@
+(executable
+ (name toylang)
+ (public_name toylang-comprehensive)
+ (package toylang_comprehensive)
+ (libraries toylang))

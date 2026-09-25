@@ -1,0 +1,6 @@
+ready := TRUE;
+IF ready THEN
+  PRINT 42;
+ELSE
+  PRINT 0;
+END;
